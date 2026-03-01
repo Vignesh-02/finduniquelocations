@@ -49,7 +49,7 @@ def fetch_location():
         "lon_max": 180, "lat_max": 70,
         "kinds": "natural",
         "rate": "3",
-        "limit": "100",
+        "limit": "500",
         "apikey": OTM_API_KEY,
     }
 
@@ -69,22 +69,28 @@ def fetch_location():
             logging.warning("No named features found.")
             return None
 
-        target = random.choice(named)
-        xid = target["properties"]["xid"]
-        details = requests.get(
-            f"https://api.opentripmap.com/0.1/en/places/xid/{xid}",
-            params={"apikey": OTM_API_KEY}, timeout=20,
-        ).json()
+        random.shuffle(named)
+        for target in named:
+            xid = target["properties"]["xid"]
+            details = requests.get(
+                f"https://api.opentripmap.com/0.1/en/places/xid/{xid}",
+                params={"apikey": OTM_API_KEY}, timeout=20,
+            ).json()
 
-        return {
-            "name": details.get("name", "Hidden Wonder"),
-            "description": details.get("wikipedia_extracts", {}).get(
-                "text", "A spectacular natural location."
-            ),
-            "country": details.get("address", {}).get("country", "Unknown"),
-            "otm_url": details.get("otm", "https://opentripmap.com"),
-            "image_url": details.get("image"),
-        }
+            if details.get("image"):
+                logging.info(f"Found location with image: {details.get('name')} (tried {named.index(target) + 1} locations)")
+                return {
+                    "name": details.get("name", "Hidden Wonder"),
+                    "description": details.get("wikipedia_extracts", {}).get(
+                        "text", "A spectacular natural location."
+                    ),
+                    "country": details.get("address", {}).get("country", "Unknown"),
+                    "otm_url": details.get("otm", "https://opentripmap.com"),
+                    "image_url": details.get("image"),
+                }
+
+        logging.warning("No locations with images found in 500 results.")
+        return None
     except Exception as e:
         logging.error(f"fetch_location error: {e}")
         return None
@@ -189,7 +195,7 @@ def generate_post(location_data):
 
     prompt = f"""You are a senior social media strategist for BuenaVista, a premium travel discovery brand.
 
-Write ONE social media post about this place. STRICT LIMIT: 270 characters max.
+Write ONE social media post about this place. STRICT LIMIT: between 240 and 290 characters. Aim for at least 240 characters. Use vivid details to fill the space.
 
 Rules:
 - Be impulsive, short, and attention-catching. Make people STOP scrolling.
@@ -216,8 +222,8 @@ Description: {location_data['description'][:500]}"""
     post_text = message.content[0].text.strip()
 
     # Bluesky limit is 300 chars (graphemes)
-    if len(post_text) > 300:
-        post_text = post_text[:300].rsplit(" ", 1)[0]
+    if len(post_text) > 290:
+        post_text = post_text[:290].rsplit(" ", 1)[0]
 
     logging.info(f"Generated Bluesky post ({len(post_text)} chars): {post_text}")
     return post_text
@@ -262,20 +268,28 @@ def bluesky_upload_image(access_token, image_path):
     return resp.json()["blob"]
 
 
-def detect_link_facets(text):
-    """Detect URLs in text and return Bluesky facets for rich links."""
+def detect_facets(text):
+    """Detect URLs and hashtags in text and return Bluesky facets."""
     import re
     facets = []
+    # Links
     for match in re.finditer(r"https?://[^\s]+|buenavista\.in", text):
         url = match.group()
         if not url.startswith("http"):
             url = "https://" + url
-        # Calculate byte positions
         start = len(text[:match.start()].encode("utf-8"))
         end = len(text[:match.end()].encode("utf-8"))
         facets.append({
             "index": {"byteStart": start, "byteEnd": end},
             "features": [{"$type": "app.bsky.richtext.facet#link", "uri": url}],
+        })
+    # Hashtags
+    for match in re.finditer(r"#(\w+)", text):
+        start = len(text[:match.start()].encode("utf-8"))
+        end = len(text[:match.end()].encode("utf-8"))
+        facets.append({
+            "index": {"byteStart": start, "byteEnd": end},
+            "features": [{"$type": "app.bsky.richtext.facet#tag", "tag": match.group(1)}],
         })
     return facets
 
@@ -294,7 +308,7 @@ def post_to_bluesky(post_text, image_path=None, location_name=""):
             "$type": "app.bsky.feed.post",
             "text": post_text,
             "createdAt": datetime.now(timezone.utc).isoformat(),
-            "facets": detect_link_facets(post_text),
+            "facets": detect_facets(post_text),
         }
 
         # Upload image if available

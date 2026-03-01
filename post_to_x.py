@@ -54,7 +54,7 @@ def fetch_location():
         "lon_max": 180, "lat_max": 70,
         "kinds": "natural",
         "rate": "3",
-        "limit": "100",
+        "limit": "500",
         "apikey": OTM_API_KEY,
     }
 
@@ -74,22 +74,28 @@ def fetch_location():
             logging.warning("No named features found.")
             return None
 
-        target = random.choice(named)
-        xid = target["properties"]["xid"]
-        details = requests.get(
-            f"https://api.opentripmap.com/0.1/en/places/xid/{xid}",
-            params={"apikey": OTM_API_KEY}, timeout=20,
-        ).json()
+        random.shuffle(named)
+        for target in named:
+            xid = target["properties"]["xid"]
+            details = requests.get(
+                f"https://api.opentripmap.com/0.1/en/places/xid/{xid}",
+                params={"apikey": OTM_API_KEY}, timeout=20,
+            ).json()
 
-        return {
-            "name": details.get("name", "Hidden Wonder"),
-            "description": details.get("wikipedia_extracts", {}).get(
-                "text", "A spectacular natural location."
-            ),
-            "country": details.get("address", {}).get("country", "Unknown"),
-            "otm_url": details.get("otm", "https://opentripmap.com"),
-            "image_url": details.get("image"),  # Wikimedia Commons image
-        }
+            if details.get("image"):
+                logging.info(f"Found location with image: {details.get('name')} (tried {named.index(target) + 1} locations)")
+                return {
+                    "name": details.get("name", "Hidden Wonder"),
+                    "description": details.get("wikipedia_extracts", {}).get(
+                        "text", "A spectacular natural location."
+                    ),
+                    "country": details.get("address", {}).get("country", "Unknown"),
+                    "otm_url": details.get("otm", "https://opentripmap.com"),
+                    "image_url": details.get("image"),
+                }
+
+        logging.warning("No locations with images found in 500 results.")
+        return None
     except Exception as e:
         logging.error(f"fetch_location error: {e}")
         return None
@@ -196,7 +202,7 @@ def generate_tweet(location_data):
 
     prompt = f"""You are a senior social media strategist for BuenaVista, a premium travel discovery brand.
 
-Write ONE tweet about this place. STRICT LIMIT: 240 characters max.
+Write ONE tweet about this place. STRICT LIMIT: between 240 and 270 characters. Aim for at least 240 characters. Use vivid details to fill the space.
 
 Rules:
 - Be impulsive, short, and attention-catching. Make people STOP scrolling.
@@ -222,9 +228,9 @@ Description: {location_data['description'][:500]}"""
 
     tweet_text = message.content[0].text.strip()
 
-    # Ensure it fits in 280 chars
-    if len(tweet_text) > 280:
-        tweet_text = tweet_text[:280].rsplit(" ", 1)[0]
+    # Ensure it fits in 270 chars
+    if len(tweet_text) > 270:
+        tweet_text = tweet_text[:270].rsplit(" ", 1)[0]
 
     logging.info(f"Generated tweet ({len(tweet_text)} chars): {tweet_text}")
     return tweet_text
