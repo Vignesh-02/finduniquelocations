@@ -38,11 +38,27 @@ UNSPLASH_ACCESS_KEY = os.environ.get("UNSPLASH_ACCESS_KEY")
 ATP_BASE = "https://bsky.social/xrpc"
 
 
+def get_posted_locations():
+    """Load previously posted location names from the log."""
+    if not os.path.exists(POSTS_LOG):
+        return set()
+    try:
+        with open(POSTS_LOG, "r") as f:
+            posts = json.load(f)
+        return {p["location"] for p in posts}
+    except Exception:
+        return set()
+
+
 def fetch_location():
     """Fetch a random breathtaking location from OpenTripMap."""
     if not OTM_API_KEY:
         logging.error("OTM_API_KEY missing!")
         return None
+
+    posted = get_posted_locations()
+    if posted:
+        logging.info(f"Skipping {len(posted)} previously posted locations.")
 
     params = {
         "lon_min": -180, "lat_min": -60,
@@ -69,8 +85,13 @@ def fetch_location():
             logging.warning("No named features found.")
             return None
 
-        random.shuffle(named)
-        for target in named:
+        # Filter out already posted locations before making detail API calls
+        candidates = [f for f in named if f["properties"].get("name") not in posted]
+        if len(candidates) < len(named):
+            logging.info(f"Filtered out {len(named) - len(candidates)} already posted locations.")
+
+        random.shuffle(candidates)
+        for target in candidates:
             xid = target["properties"]["xid"]
             details = requests.get(
                 f"https://api.opentripmap.com/0.1/en/places/xid/{xid}",
@@ -78,9 +99,10 @@ def fetch_location():
             ).json()
 
             if details.get("image"):
-                logging.info(f"Found location with image: {details.get('name')} (tried {named.index(target) + 1} locations)")
+                name = details.get("name", "Hidden Wonder")
+                logging.info(f"Found location with image: {name} (tried {candidates.index(target) + 1} locations)")
                 return {
-                    "name": details.get("name", "Hidden Wonder"),
+                    "name": name,
                     "description": details.get("wikipedia_extracts", {}).get(
                         "text", "A spectacular natural location."
                     ),
@@ -89,7 +111,7 @@ def fetch_location():
                     "image_url": details.get("image"),
                 }
 
-        logging.warning("No locations with images found in 500 results.")
+        logging.warning("No new locations with images found in 500 results.")
         return None
     except Exception as e:
         logging.error(f"fetch_location error: {e}")
