@@ -1,0 +1,42 @@
+name: Daily BuenaVista Post
+
+on:
+  schedule:
+    # Runs at 4:05 PM IST (10:35 AM UTC) every day
+    - cron: "35 10 * * *"
+  workflow_dispatch: # Allow manual trigger from GitHub UI
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run daily post script
+        env:
+          OTM_API_KEY: ${{ secrets.OTM_API_KEY }}
+          CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+          X_API_KEY: ${{ secrets.X_API_KEY }}
+          X_API_SECRET: ${{ secrets.X_API_SECRET }}
+          X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
+          X_ACCESS_TOKEN_SECRET: ${{ secrets.X_ACCESS_TOKEN_SECRET }}
+          UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
+        run: python post_to_x.py
+
+      - name: Commit new location file
+        run: |
+          git config user.name "BuenaVista Bot"
+          git config user.email "bot@buenavista.in"
+          git add DailyViews/
+          git diff --cached --quiet || git commit -m "🌍 Daily location: $(date +%Y-%m-%d)"
+          git push

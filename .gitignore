@@ -1,0 +1,8 @@
+.env
+__pycache__/
+*.pyc
+DailyViews/daily_locations.log
+DailyViews/cron_system.log
+DailyViews/posted_tweets.json
+.claude/
+.qodo/
