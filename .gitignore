@@ -4,5 +4,6 @@ __pycache__/
 DailyViews/daily_locations.log
 DailyViews/cron_system.log
 DailyViews/posted_tweets.json
+DailyViews/posted_bluesky.json
 .claude/
 .qodo/

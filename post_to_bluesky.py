@@ -1,29 +1,24 @@
 """
-Daily X (Twitter) poster for BuenaVista.
-Fetches a random location from OpenTripMap, generates an engaging tweet
-using Claude AI, and posts it to X with a link to buenavista.in.
+Daily Bluesky poster for BuenaVista.
+Fetches a random location from OpenTripMap, generates an engaging post
+using Claude AI, and posts it to Bluesky with a link to buenavista.in.
 """
 
 import os
 import json
 import tempfile
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 import requests
-import tweepy
-import tweepy.client
 import anthropic
-
-# Use api.x.com instead of api.twitter.com (Cloudflare blocks twitter.com on some IPs)
-tweepy.client.BaseClient.host = "https://api.x.com"
 
 # --- PATH SETUP ---
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.join(SCRIPT_DIR, "DailyViews")
 SAVE_DIR = os.path.join(BASE_DIR, "Locations")
 LOG_FILE = os.path.join(BASE_DIR, "daily_locations.log")
-POSTS_LOG = os.path.join(BASE_DIR, "posted_tweets.json")
+POSTS_LOG = os.path.join(BASE_DIR, "posted_bluesky.json")
 
 os.makedirs(SAVE_DIR, exist_ok=True)
 
@@ -36,11 +31,11 @@ logging.basicConfig(
 # --- CONFIG FROM ENV ---
 OTM_API_KEY = os.environ.get("OTM_API_KEY")
 CLAUDE_API_KEY = os.environ.get("CLAUDE_API_KEY")
-X_API_KEY = os.environ.get("X_API_KEY")
-X_API_SECRET = os.environ.get("X_API_SECRET")
-X_ACCESS_TOKEN = os.environ.get("X_ACCESS_TOKEN")
-X_ACCESS_TOKEN_SECRET = os.environ.get("X_ACCESS_TOKEN_SECRET")
+BLUESKY_HANDLE = os.environ.get("BLUESKY_HANDLE")
+BLUESKY_APP_PASSWORD = os.environ.get("BLUESKY_APP_PASSWORD")
 UNSPLASH_ACCESS_KEY = os.environ.get("UNSPLASH_ACCESS_KEY")
+
+ATP_BASE = "https://bsky.social/xrpc"
 
 
 def fetch_location():
@@ -88,7 +83,7 @@ def fetch_location():
             ),
             "country": details.get("address", {}).get("country", "Unknown"),
             "otm_url": details.get("otm", "https://opentripmap.com"),
-            "image_url": details.get("image"),  # Wikimedia Commons image
+            "image_url": details.get("image"),
         }
     except Exception as e:
         logging.error(f"fetch_location error: {e}")
@@ -96,7 +91,7 @@ def fetch_location():
 
 
 def save_location_file(data):
-    """Save location as markdown (same format as daily_view.py)."""
+    """Save location as markdown."""
     date_str = datetime.now().strftime("%Y-%m-%d")
     clean_name = "".join(
         x for x in data["name"] if x.isalnum() or x in " -_"
@@ -105,7 +100,7 @@ def save_location_file(data):
     filepath = os.path.join(SAVE_DIR, filename)
 
     content = (
-        f"# 🌍 Daily Discovery: {data['name']}\n"
+        f"# Daily Discovery: {data['name']}\n"
         f"**Country:** {data['country']}\n\n"
         f"{data['description']}\n\n"
         f"[OpenTripMap]({data['otm_url']})"
@@ -118,9 +113,8 @@ def save_location_file(data):
 
 
 def fetch_image(location_data):
-    """Download a photo for the location. Tries OpenTripMap image first, then Unsplash."""
+    """Download a photo for the location."""
 
-    # 1. Try the Wikimedia Commons image from OpenTripMap
     wiki_url = location_data.get("image_url")
     if wiki_url:
         try:
@@ -158,7 +152,6 @@ def fetch_image(location_data):
         except Exception as e:
             logging.warning(f"Wikimedia image failed: {e}")
 
-    # 2. Fallback to Unsplash
     if UNSPLASH_ACCESS_KEY:
         try:
             search_query = f"{location_data['name']} {location_data['country']} nature landscape"
@@ -171,7 +164,7 @@ def fetch_image(location_data):
             if resp.status_code == 200:
                 results = resp.json().get("results", [])
                 if results:
-                    img_url = results[0]["urls"]["regular"]  # 1080px wide
+                    img_url = results[0]["urls"]["regular"]
                     img_resp = requests.get(img_url, timeout=15)
                     if img_resp.status_code == 200:
                         image_path = os.path.join(tempfile.gettempdir(), "buenavista_daily.jpg")
@@ -186,8 +179,8 @@ def fetch_image(location_data):
     return None
 
 
-def generate_tweet(location_data):
-    """Use Claude to generate an engaging tweet about the location."""
+def generate_post(location_data):
+    """Use Claude to generate an engaging Bluesky post about the location."""
     if not CLAUDE_API_KEY:
         logging.error("CLAUDE_API_KEY missing!")
         return None
@@ -196,7 +189,7 @@ def generate_tweet(location_data):
 
     prompt = f"""You are a senior social media strategist for BuenaVista, a premium travel discovery brand.
 
-Write ONE tweet about this place. STRICT LIMIT: 240 characters max.
+Write ONE social media post about this place. STRICT LIMIT: 270 characters max.
 
 Rules:
 - Be impulsive, short, and attention-catching. Make people STOP scrolling.
@@ -208,7 +201,7 @@ Rules:
 - End with #travel
 - Do NOT use ellipsis (...) anywhere.
 - Do NOT use em dashes (—) or double dashes (--) anywhere.
-- Do NOT use quotes. Just the tweet text, nothing else.
+- Do NOT use quotes. Just the post text, nothing else.
 
 Place: {location_data['name']}
 Country: {location_data['country']}
@@ -220,68 +213,133 @@ Description: {location_data['description'][:500]}"""
         messages=[{"role": "user", "content": prompt}],
     )
 
-    tweet_text = message.content[0].text.strip()
+    post_text = message.content[0].text.strip()
 
-    # Ensure it fits in 280 chars
-    if len(tweet_text) > 280:
-        tweet_text = tweet_text[:280].rsplit(" ", 1)[0]
+    # Bluesky limit is 300 chars (graphemes)
+    if len(post_text) > 300:
+        post_text = post_text[:300].rsplit(" ", 1)[0]
 
-    logging.info(f"Generated tweet ({len(tweet_text)} chars): {tweet_text}")
-    return tweet_text
+    logging.info(f"Generated Bluesky post ({len(post_text)} chars): {post_text}")
+    return post_text
 
 
-def post_to_x(tweet_text, image_path=None):
-    """Post the tweet to X with an optional image."""
-    if not all([X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_TOKEN_SECRET]):
-        logging.error("X API credentials missing!")
-        return None
-
-    # v2 client for creating tweets
-    client = tweepy.Client(
-        consumer_key=X_API_KEY,
-        consumer_secret=X_API_SECRET,
-        access_token=X_ACCESS_TOKEN,
-        access_token_secret=X_ACCESS_TOKEN_SECRET,
+def bluesky_login():
+    """Authenticate with Bluesky and return session tokens."""
+    resp = requests.post(
+        f"{ATP_BASE}/com.atproto.server.createSession",
+        json={"identifier": BLUESKY_HANDLE, "password": BLUESKY_APP_PASSWORD},
+        timeout=15,
     )
+    resp.raise_for_status()
+    session = resp.json()
+    return session["did"], session["accessJwt"]
+
+
+def bluesky_upload_image(access_token, image_path):
+    """Upload an image to Bluesky and return the blob reference."""
+    # Detect MIME type from extension
+    ext = os.path.splitext(image_path)[-1].lower()
+    mime_types = {
+        ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+        ".png": "image/png", ".gif": "image/gif",
+        ".webp": "image/webp",
+    }
+    mime_type = mime_types.get(ext, "image/jpeg")
+
+    with open(image_path, "rb") as f:
+        img_data = f.read()
+
+    resp = requests.post(
+        f"{ATP_BASE}/com.atproto.repo.uploadBlob",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": mime_type,
+        },
+        data=img_data,
+        timeout=30,
+    )
+    resp.raise_for_status()
+    return resp.json()["blob"]
+
+
+def detect_link_facets(text):
+    """Detect URLs in text and return Bluesky facets for rich links."""
+    import re
+    facets = []
+    for match in re.finditer(r"https?://[^\s]+|buenavista\.in", text):
+        url = match.group()
+        if not url.startswith("http"):
+            url = "https://" + url
+        # Calculate byte positions
+        start = len(text[:match.start()].encode("utf-8"))
+        end = len(text[:match.end()].encode("utf-8"))
+        facets.append({
+            "index": {"byteStart": start, "byteEnd": end},
+            "features": [{"$type": "app.bsky.richtext.facet#link", "uri": url}],
+        })
+    return facets
+
+
+def post_to_bluesky(post_text, image_path=None):
+    """Post to Bluesky with optional image."""
+    if not BLUESKY_HANDLE or not BLUESKY_APP_PASSWORD:
+        logging.error("Bluesky credentials missing!")
+        return None
 
     try:
-        media_ids = None
+        did, access_token = bluesky_login()
 
-        # Upload image using v1.1 API (required for media upload)
+        # Build the post record
+        record = {
+            "$type": "app.bsky.feed.post",
+            "text": post_text,
+            "createdAt": datetime.now(timezone.utc).isoformat(),
+            "facets": detect_link_facets(post_text),
+        }
+
+        # Upload image if available
         if image_path and os.path.exists(image_path):
             try:
-                auth = tweepy.OAuth1UserHandler(
-                    X_API_KEY, X_API_SECRET,
-                    X_ACCESS_TOKEN, X_ACCESS_TOKEN_SECRET,
-                )
-                api_v1 = tweepy.API(auth, host="api.x.com", upload_host="upload.x.com")
-                media = api_v1.media_upload(filename=image_path)
-                media_ids = [media.media_id]
-                logging.info(f"Uploaded image, media_id: {media.media_id}")
+                blob = bluesky_upload_image(access_token, image_path)
+                record["embed"] = {
+                    "$type": "app.bsky.embed.images",
+                    "images": [{"alt": "Travel destination photo", "image": blob}],
+                }
+                logging.info("Uploaded image to Bluesky")
             except Exception as img_err:
-                logging.warning(f"Image upload failed, posting without image: {img_err}")
+                logging.warning(f"Bluesky image upload failed, posting without image: {img_err}")
 
-        response = client.create_tweet(text=tweet_text, media_ids=media_ids)
-        tweet_id = response.data["id"]
-        logging.info(f"Posted to X! Tweet ID: {tweet_id}")
-        return tweet_id
+        # Create the post
+        resp = requests.post(
+            f"{ATP_BASE}/com.atproto.repo.createRecord",
+            headers={"Authorization": f"Bearer {access_token}"},
+            json={
+                "repo": did,
+                "collection": "app.bsky.feed.post",
+                "record": record,
+            },
+            timeout=15,
+        )
+        resp.raise_for_status()
+        result = resp.json()
+        post_uri = result["uri"]
+        logging.info(f"Posted to Bluesky! URI: {post_uri}")
+        return post_uri
+
     except Exception as e:
-        logging.error(f"Failed to post to X: {e}")
-        print(f"X API Error: {e}")
-        if hasattr(e, 'response') and e.response is not None:
-            logging.error(f"X API response: {e.response.text}")
-            print(f"X API Response: {e.response.text[:500]}")
+        logging.error(f"Failed to post to Bluesky: {e}")
+        print(f"Bluesky Error: {e}")
         return None
 
 
-def log_posted_tweet(location_data, tweet_text, tweet_id):
-    """Keep a log of all posted tweets."""
+def log_posted(location_data, post_text, post_uri):
+    """Keep a log of all posted Bluesky posts."""
     entry = {
         "date": datetime.now().isoformat(),
         "location": location_data["name"],
         "country": location_data["country"],
-        "tweet": tweet_text,
-        "tweet_id": tweet_id,
+        "post": post_text,
+        "post_uri": post_uri,
     }
 
     posts = []
@@ -296,7 +354,7 @@ def log_posted_tweet(location_data, tweet_text, tweet_id):
 
 
 if __name__ == "__main__":
-    print("🌍 BuenaVista Daily Post")
+    print("🦋 BuenaVista Bluesky Post")
 
     # Step 1: Fetch location
     location = fetch_location()
@@ -310,13 +368,13 @@ if __name__ == "__main__":
     filepath = save_location_file(location)
     print(f"📄 Saved: {filepath}")
 
-    # Step 3: Generate tweet with AI
-    tweet = generate_tweet(location)
-    if not tweet:
-        print("Failed to generate tweet. Check daily_locations.log")
+    # Step 3: Generate post with AI
+    post = generate_post(location)
+    if not post:
+        print("Failed to generate post. Check daily_locations.log")
         exit(1)
 
-    print(f"🐦 Tweet: {tweet}")
+    print(f"🦋 Post: {post}")
 
     # Step 4: Fetch image
     image_path = fetch_image(location)
@@ -325,12 +383,12 @@ if __name__ == "__main__":
     else:
         print("⚠️  No image found, posting without image.")
 
-    # Step 5: Post to X
-    tweet_id = post_to_x(tweet, image_path)
-    if not tweet_id:
-        print("Failed to post to X. Check daily_locations.log")
+    # Step 5: Post to Bluesky
+    post_uri = post_to_bluesky(post, image_path)
+    if not post_uri:
+        print("Failed to post to Bluesky. Check daily_locations.log")
         exit(1)
 
     # Step 6: Log it
-    log_posted_tweet(location, tweet, tweet_id)
-    print(f"✅ Posted! Tweet ID: {tweet_id}")
+    log_posted(location, post, post_uri)
+    print(f"✅ Posted! URI: {post_uri}")
