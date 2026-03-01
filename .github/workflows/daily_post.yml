@@ -31,22 +31,11 @@ jobs:
           UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
         run: python post_to_bluesky.py
 
-      - name: Post to X
-        env:
-          OTM_API_KEY: ${{ secrets.OTM_API_KEY }}
-          CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
-          X_API_KEY: ${{ secrets.X_API_KEY }}
-          X_API_SECRET: ${{ secrets.X_API_SECRET }}
-          X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
-          X_ACCESS_TOKEN_SECRET: ${{ secrets.X_ACCESS_TOKEN_SECRET }}
-          UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
-        run: python post_to_x.py
-        continue-on-error: true  # Don't fail the workflow if X is blocked
-
+      
       - name: Commit new location files
         run: |
-          git config user.name "BuenaVista Bot"
-          git config user.email "bot@buenavista.in"
+          git config user.name "Vignesh"
+          git config user.email "laserlikefocus000@gmail.com"
           git add DailyViews/
-          git diff --cached --quiet || git commit -m "🌍 Daily location: $(date +%Y-%m-%d)"
+          git diff --cached --quiet || git commit -m "Daily location: $(date +%Y-%m-%d)"
           git push

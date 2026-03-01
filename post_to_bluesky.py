@@ -280,7 +280,7 @@ def detect_link_facets(text):
     return facets
 
 
-def post_to_bluesky(post_text, image_path=None):
+def post_to_bluesky(post_text, image_path=None, location_name=""):
     """Post to Bluesky with optional image."""
     if not BLUESKY_HANDLE or not BLUESKY_APP_PASSWORD:
         logging.error("Bluesky credentials missing!")
@@ -303,7 +303,7 @@ def post_to_bluesky(post_text, image_path=None):
                 blob = bluesky_upload_image(access_token, image_path)
                 record["embed"] = {
                     "$type": "app.bsky.embed.images",
-                    "images": [{"alt": "Travel destination photo", "image": blob}],
+                    "images": [{"alt": location_name or "BuenaVista travel discovery", "image": blob}],
                 }
                 logging.info("Uploaded image to Bluesky")
             except Exception as img_err:
@@ -384,7 +384,7 @@ if __name__ == "__main__":
         print("⚠️  No image found, posting without image.")
 
     # Step 5: Post to Bluesky
-    post_uri = post_to_bluesky(post, image_path)
+    post_uri = post_to_bluesky(post, image_path, location["name"])
     if not post_uri:
         print("Failed to post to Bluesky. Check daily_locations.log")
         exit(1)
