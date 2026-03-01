@@ -165,12 +165,12 @@ def generate_tweet(location_data):
 
     client = anthropic.Anthropic(api_key=CLAUDE_API_KEY)
 
-    prompt = f"""Write a single tweet (max 260 characters) about this place.
+    prompt = f"""Write a single tweet about this place. STRICT LIMIT: 240 characters max.
 Do NOT write in first person. Do NOT say "I visited" or "I went" or "Just returned".
-Instead, present it as a recommendation — like telling someone "you should check this out".
-Highlight what makes this place unique using the description.
-End with a soft call to action inviting readers to explore more and connect with fellow travelers at buenavista.in.
+Present it as a recommendation — tell people why they should check this place out.
+Highlight what makes it unique using the description.
 Include 1-2 relevant emojis naturally.
+End with: Explore more at buenavista.in
 Do NOT use hashtags. Do NOT use quotes. Just the tweet text.
 
 Place: {location_data['name']}
@@ -232,8 +232,10 @@ def post_to_x(tweet_text, image_path=None):
         return tweet_id
     except Exception as e:
         logging.error(f"Failed to post to X: {e}")
+        print(f"X API Error: {e}")
         if hasattr(e, 'response') and e.response is not None:
             logging.error(f"X API response: {e.response.text}")
+            print(f"X API Response: {e.response.text[:500]}")
         return None
 
 
