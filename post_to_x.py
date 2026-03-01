@@ -12,7 +12,11 @@ from datetime import datetime
 
 import requests
 import tweepy
+import tweepy.client
 import anthropic
+
+# Use api.x.com instead of api.twitter.com (Cloudflare blocks twitter.com on some IPs)
+tweepy.client.BaseClient.host = "https://api.x.com"
 
 # --- PATH SETUP ---
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -219,7 +223,7 @@ def post_to_x(tweet_text, image_path=None):
                     X_API_KEY, X_API_SECRET,
                     X_ACCESS_TOKEN, X_ACCESS_TOKEN_SECRET,
                 )
-                api_v1 = tweepy.API(auth)
+                api_v1 = tweepy.API(auth, host="api.x.com", upload_host="upload.x.com")
                 media = api_v1.media_upload(filename=image_path)
                 media_ids = [media.media_id]
                 logging.info(f"Uploaded image, media_id: {media.media_id}")
