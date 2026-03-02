@@ -68,7 +68,7 @@ def fetch_location():
     params = {
         "lon_min": -180, "lat_min": -60,
         "lon_max": 180, "lat_max": 70,
-        "kinds": "natural",
+        "kinds": "natural,architecture,historic,religion,beaches,geological_formations",
         "rate": "3",
         "limit": "500",
         "apikey": OTM_API_KEY,
@@ -85,7 +85,12 @@ def fetch_location():
 
         import random
         features = resp.json().get("features", [])
-        named = [f for f in features if f["properties"].get("name")]
+        SKIP_KINDS = {"cemeteries", "burial_places"}
+        named = [
+            f for f in features
+            if f["properties"].get("name")
+            and not SKIP_KINDS & set(f["properties"].get("kinds", "").split(","))
+        ]
         if not named:
             logging.warning("No named features found.")
             return None
@@ -224,7 +229,7 @@ def generate_tweet(location_data):
 
     prompt = f"""You are a senior social media strategist for BuenaVista, a premium travel discovery brand.
 
-Write ONE tweet about this place. STRICT LIMIT: between 240 and 270 characters. Aim for at least 240 characters. Use vivid details to fill the space.
+Write ONE tweet about this place. STRICT LIMIT: between 240 and 270 characters (count carefully!). The post MUST end with "buenavista.in #travel" — budget 25 characters for this ending. Use vivid details to fill the remaining space.
 
 Rules:
 - Be impulsive, short, and attention-catching. Make people STOP scrolling.
@@ -237,6 +242,7 @@ Rules:
 - Do NOT use ellipsis (...) anywhere.
 - Do NOT use em dashes (—) or double dashes (--) anywhere.
 - Do NOT use quotes. Just the tweet text, nothing else.
+- Do NOT include character counts, metadata, or any text that isn't the tweet itself.
 
 Place: {location_data['name']}
 Country: {location_data['country']}
@@ -249,6 +255,10 @@ Description: {location_data['description'][:500]}"""
     )
 
     tweet_text = message.content[0].text.strip()
+
+    # Strip any character count metadata the AI might append
+    import re
+    tweet_text = re.split(r"\n+Character count:", tweet_text)[0].strip()
 
     # Ensure it fits in 270 chars
     if len(tweet_text) > 270:

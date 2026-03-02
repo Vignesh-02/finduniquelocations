@@ -63,7 +63,7 @@ def fetch_location():
     params = {
         "lon_min": -180, "lat_min": -60,
         "lon_max": 180, "lat_max": 70,
-        "kinds": "natural",
+        "kinds": "natural,architecture,historic,religion,beaches,geological_formations",
         "rate": "3",
         "limit": "500",
         "apikey": OTM_API_KEY,
@@ -80,7 +80,12 @@ def fetch_location():
 
         import random
         features = resp.json().get("features", [])
-        named = [f for f in features if f["properties"].get("name")]
+        SKIP_KINDS = {"cemeteries", "burial_places"}
+        named = [
+            f for f in features
+            if f["properties"].get("name")
+            and not SKIP_KINDS & set(f["properties"].get("kinds", "").split(","))
+        ]
         if not named:
             logging.warning("No named features found.")
             return None
@@ -217,7 +222,7 @@ def generate_post(location_data):
 
     prompt = f"""You are a senior social media strategist for BuenaVista, a premium travel discovery brand.
 
-Write ONE social media post about this place. STRICT LIMIT: between 240 and 290 characters. Aim for at least 240 characters. Use vivid details to fill the space.
+Write ONE social media post about this place. STRICT LIMIT: between 240 and 280 characters (count carefully!). The post MUST end with "buenavista.in #travel" — budget 25 characters for this ending. Use vivid details to fill the remaining space.
 
 Rules:
 - Be impulsive, short, and attention-catching. Make people STOP scrolling.
@@ -230,6 +235,7 @@ Rules:
 - Do NOT use ellipsis (...) anywhere.
 - Do NOT use em dashes (—) or double dashes (--) anywhere.
 - Do NOT use quotes. Just the post text, nothing else.
+- Do NOT include character counts, metadata, or any text that isn't the post itself.
 
 Place: {location_data['name']}
 Country: {location_data['country']}
@@ -242,6 +248,10 @@ Description: {location_data['description'][:500]}"""
     )
 
     post_text = message.content[0].text.strip()
+
+    # Strip any character count metadata the AI might append
+    import re
+    post_text = re.split(r"\n+Character count:", post_text)[0].strip()
 
     # Bluesky limit is 300 chars (graphemes)
     if len(post_text) > 290:
