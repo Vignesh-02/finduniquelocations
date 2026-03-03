@@ -63,7 +63,7 @@ def fetch_location():
     params = {
         "lon_min": -180, "lat_min": -60,
         "lon_max": 180, "lat_max": 70,
-        "kinds": "natural,architecture,historic,religion,beaches,geological_formations",
+        "kinds": "natural,beaches,view_points,castles,gardens_and_parks,churches,cathedrals,monasteries,mosques,palaces,bridges,lighthouses,towers,aqueducts",
         "rate": "3",
         "limit": "500",
         "apikey": OTM_API_KEY,
@@ -80,7 +80,7 @@ def fetch_location():
 
         import random
         features = resp.json().get("features", [])
-        SKIP_KINDS = {"cemeteries", "burial_places"}
+        SKIP_KINDS = {"cemeteries", "burial_places", "historic_districts", "historical_places", "other_buildings_and_structures", "settlements", "milestones", "museums"}
         named = [
             f for f in features
             if f["properties"].get("name")
@@ -103,14 +103,13 @@ def fetch_location():
                 params={"apikey": OTM_API_KEY}, timeout=20,
             ).json()
 
-            if details.get("image"):
+            wiki_desc = details.get("wikipedia_extracts", {}).get("text", "")
+            if details.get("image") and len(wiki_desc) >= 200:
                 name = details.get("name", "Hidden Wonder")
                 logging.info(f"Found location with image: {name} (tried {candidates.index(target) + 1} locations)")
                 return {
                     "name": name,
-                    "description": details.get("wikipedia_extracts", {}).get(
-                        "text", "A spectacular natural location."
-                    ),
+                    "description": wiki_desc,
                     "country": details.get("address", {}).get("country", "Unknown"),
                     "otm_url": details.get("otm", "https://opentripmap.com"),
                     "image_url": details.get("image"),
