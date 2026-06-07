@@ -1,0 +1,6 @@
+# Daily Discovery: Fort Monroe
+**Country:** United States of America
+
+Fort Monroe, managed by partnership between the Fort Monroe Authority for the Commonwealth of Virginia, the National Park Service as the Fort Monroe National Monument, and the City of Hampton, is a former military installation in Hampton, Virginia, at Old Point Comfort, the southern tip of the Virginia Peninsula, United States. Along with Fort Wool, Fort Monroe originally guarded the navigation channel between the Chesapeake Bay and Hampton Roads—the natural roadstead at the confluence of the Elizabeth, the Nansemond and the James rivers. Until disarmament in 1946, the areas protected by the fort were the entire Chesapeake Bay and Potomac River regions, including the water approaches to the cities of Washington, D.C. and Baltimore, Maryland, along with important shipyards and naval bases in the Hampton Roads area. Surrounded by a moat, the six-sided bastion fort is the largest fort by area ever built in the United States.
+
+[OpenTripMap](https://opentripmap.com/en/card/W51064272)
