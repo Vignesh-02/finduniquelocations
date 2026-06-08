@@ -1,0 +1,6 @@
+# Daily Discovery: Immaculate Conception School
+**Country:** United States of America
+
+The Church of the Immaculate Conception and Clergy House at 406-412 East 14th Street between First Avenue and Avenue A in the East Village neighborhood of Manhattan, New York City were built in 1894-96 by Grace Church, one of the most prominent Episcopal churches in the city at the time. The buildings were a free chapel – meaning there was no pew rent – called Grace Chapel and a connected Grace Hospital, which could serve 16 senior citizens and 10 children, and was physically connected to the chapel by a bridge, so that patients could be wheeled to services.
+
+[OpenTripMap](https://opentripmap.com/en/card/W247864236)
