@@ -1,0 +1,6 @@
+# Daily Discovery: Saint John's Episcopal Church
+**Country:** United States of America
+
+St. John's Protestant Episcopal Church is a historic Episcopal church at One Hudson Street in the Getty Square neighborhood of Yonkers, Westchester County, New York. The complex includes the church, chapel, rectory, parish house, and school. The church was originally constructed in 1752, with an addition in 1849, and modifications to the front facade in 1874 by architect Edward Tuckerman Potter (1831–1904). It is constructed of rough gray fieldstone with red brick on the corners. It is cruciform in plan, three bays wide, with a slate-covered gable roof. The front facade features a rose window and four battered buttresses. The parish house and chapel were constructed in 1890–1891 and are connected to the church. The 2+1⁄2-story, five-bay-wide rectory was also constructed in 1890–1891 and is connected to the chapel. The additions made during 1890–1891 were by architect Robert Henderson Robertson (1849–1919). A group of women from the church founded St. John's Riverside Hospital in 1869 to care for the poor of the parish.
+
+[OpenTripMap](https://opentripmap.com/en/card/W506817495)
